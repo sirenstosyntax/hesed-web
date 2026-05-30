@@ -1,135 +1,85 @@
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { redirect } from 'next/navigation'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const TRANSLATIONS = {
   NIV: '78a9f6124f344018-01',
   MSG: '6f11a7de016f942e-01',
-  AMP: 'a81b73293d3080c9-01',
   KJV: 'de4e12af7f28f599-02',
-  ESV: '106da70f-e1a0-48a5-a98b-10fa06064c8c-01',
 }
 
-async function fetchPassage(reference) {
+async function fetchPassages(reference) {
   const apiKey = process.env.BIBLE_API_KEY
   const results = []
 
-  for (const [name, bibleId] of Object.entries(TRANSLATIONS)) {
-    try {
-      const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/search?query=${encodeURIComponent(reference)}&limit=1`
-      const res = await fetch(url, {
-        headers: { 'api-key': apiKey },
-        signal: AbortSignal.timeout(8000),
-      })
-      const data = await res.json()
-      const passages = data?.data?.passages || []
-      if (passages[0]) {
-        const text = passages[0].content.replace(/<[^>]+>/g, '').trim()
-        results.push({ name, text })
+  await Promise.all(
+    Object.entries(TRANSLATIONS).map(async ([name, bibleId]) => {
+      try {
+        const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/search?query=${encodeURIComponent(reference)}&limit=1`
+        const res = await fetch(url, {
+          headers: { 'api-key': apiKey },
+          signal: AbortSignal.timeout(8000),
+        })
+        const data = await res.json()
+        const passages = data?.data?.passages || []
+        if (passages[0]) {
+          const text = passages[0].content.replace(/<[^>]+>/g, '').trim()
+          results.push({ name, text })
+        }
+      } catch {
+        // Skip failed translations
       }
-    } catch {
-      // Skip failed translations silently
-    }
-  }
+    })
+  )
 
   return results
 }
 
-async function gatherResearch(reference) {
-  const tools = [
-    {
-      name: 'web_search',
-      description: 'Search the web for information about a Bible passage',
-      input_schema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'The search query' }
-        },
-        required: ['query']
-      }
-    }
-  ]
-
-  const messages = [{
-    role: 'user',
-    content: `Research the Bible passage ${reference}. Search for:
-1. Historical and cultural context
-2. What scholars commonly overlook in this passage
-3. Greek or Hebrew word insights
-
-Provide a comprehensive research summary.`
-  }]
-
-  let response
-  while (true) {
-    response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000,
-      tools,
-      messages,
+async function searchContext(reference) {
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: process.env.TAVILY_API_KEY,
+        query: `${reference} Bible historical context commentary Greek Hebrew word study`,
+        max_results: 5,
+      }),
+      signal: AbortSignal.timeout(10000),
     })
-
-    if (response.stop_reason === 'end_turn') {
-      return response.content.find(b => b.type === 'text')?.text || ''
-    }
-
-    messages.push({ role: 'assistant', content: response.content })
-
-    const toolResults = []
-    for (const block of response.content) {
-      if (block.type === 'tool_use' && block.name === 'web_search') {
-        try {
-          const searchRes = await fetch(
-            `https://api.tavily.com/search`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                api_key: process.env.TAVILY_API_KEY,
-                query: block.input.query,
-                max_results: 4,
-              }),
-            }
-          )
-          const searchData = await searchRes.json()
-          const results = searchData.results?.map(r => `${r.title}: ${r.content}`).join('\n\n') || 'No results'
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: results })
-        } catch {
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: 'Search failed' })
-        }
-      }
-    }
-    messages.push({ role: 'user', content: toolResults })
+    const data = await res.json()
+    return data.results?.map(r => `${r.title}: ${r.content}`).join('\n\n') || ''
+  } catch {
+    return ''
   }
 }
 
-async function extractStructuredContent(reference, research, translations) {
+async function generateStudyContent(reference, translations, webContext) {
   const passageText = translations.map(t => `[${t.name}]\n${t.text}`).join('\n\n')
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 16000,
-    system: 'You are a helpful assistant that structures Bible study research into JSON format. Return only valid JSON with no markdown or extra text.',
+    system: 'You are a Bible study assistant. Return only valid JSON with no markdown or extra text.',
     messages: [{
       role: 'user',
-      content: `Structure this Bible study for ${reference} into JSON.
+      content: `Create a comprehensive Bible study for ${reference}.
 
 Passage texts:
 ${passageText}
 
-Research:
-${research}
+Research context:
+${webContext || 'Use your knowledge of historical context, Greek/Hebrew insights, and biblical scholarship.'}
 
-Return a JSON object with these exact keys:
-- passage: object with translations array (each has name and text fields) — use the passage texts provided above
-- context: object with summary string and sections array (each has heading and content)
-- deeper: object with summary string and sections array (each has heading, content, and optional isWordStudy boolean)
-- application: object with hesedConnection string and sections array (each has heading and content)
-- journal: object with prompt string
+Structure everything as a JSON object with these keys:
+- passage: object with translations array (each has name and text — use the passage texts above verbatim)
+- context: object with summary string and sections array (each has heading and content) — cover historical background, cultural setting, geographic details
+- deeper: object with summary string and sections array (each has heading, content, optional isWordStudy boolean) — cover what scholars miss, Greek/Hebrew words, cross-references  
+- application: object with hesedConnection string (how this reveals God's steadfast love) and sections array (each has heading and content) — cover reflection, questions, prayer
+- journal: object with prompt string — one thoughtful journal prompt
 
-Be thorough. Return only the JSON object.`
+Be thorough and write with theological depth and pastoral warmth. Return only the JSON object.`
     }]
   })
 
@@ -150,7 +100,7 @@ export async function POST(request) {
     return Response.json({ error: 'Passage is required' }, { status: 400 })
   }
 
-  // Create session placeholder immediately so we have an ID to return
+  // Create session placeholder
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .insert({
@@ -165,18 +115,19 @@ export async function POST(request) {
     return Response.json({ error: 'Could not create session' }, { status: 500 })
   }
 
-  // Return session ID immediately — generation continues in background
   const sessionId = session.id
 
-  // Run generation asynchronously
+  // Run generation in background
   ;(async () => {
     try {
-      const [translations, research] = await Promise.all([
-        fetchPassage(passage),
-        gatherResearch(passage),
+      // Fetch passages and search context in parallel
+      const [translations, webContext] = await Promise.all([
+        fetchPassages(passage),
+        searchContext(passage),
       ])
 
-      const studyContent = await extractStructuredContent(passage, research, translations)
+      // Single Claude call combining research and formatting
+      const studyContent = await generateStudyContent(passage, translations, webContext)
 
       await supabase
         .from('sessions')
