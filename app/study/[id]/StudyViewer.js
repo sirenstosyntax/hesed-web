@@ -18,6 +18,8 @@ export default function StudyViewer({ session, userId }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [aiResponse, setAiResponse] = useState('')
+  const [loadingResponse, setLoadingResponse] = useState(false)
 
   const content = session.study_content
   const supabase = createClient()
@@ -28,6 +30,7 @@ export default function StudyViewer({ session, userId }) {
     setSaveError('')
 
     try {
+      // Save journal entry
       const { error } = await supabase.from('journal_entries').insert({
         user_id: userId,
         session_id: session.id,
@@ -37,18 +40,30 @@ export default function StudyViewer({ session, userId }) {
 
       if (error) throw error
 
-      // Save themes via API route
-      await fetch('/api/save-themes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          passage: session.passage,
-          journalEntry,
-        }),
-      })
-
       setSaved(true)
       setSaving(false)
+
+      // Get AI response
+      setLoadingResponse(true)
+      try {
+        const res = await fetch('/api/journal-response', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            journalEntry,
+            passage: session.passage,
+            journalPrompt: content.journal?.prompt || '',
+          }),
+        })
+        const data = await res.json()
+        if (data.reflection) {
+          setAiResponse(data.reflection)
+        }
+      } catch {
+        // AI response failing shouldn't affect the save confirmation
+      }
+      setLoadingResponse(false)
+
     } catch (err) {
       setSaveError('Could not save your entry. Please try again.')
       setSaving(false)
@@ -240,17 +255,7 @@ export default function StudyViewer({ session, userId }) {
                 </div>
               )}
 
-              {saved ? (
-                <div style={{
-                  background: '#eef5ee',
-                  border: '1px solid #5a8a5a',
-                  borderRadius: '5px',
-                  padding: '16px',
-                  color: '#3a6a3a',
-                }}>
-                  ✓ Journal entry saved. This will help personalize future studies.
-                </div>
-              ) : (
+              {!saved ? (
                 <>
                   <textarea
                     value={journalEntry}
@@ -291,6 +296,59 @@ export default function StudyViewer({ session, userId }) {
                     {saving ? 'Saving...' : 'Save Entry'}
                   </button>
                 </>
+              ) : (
+                <div>
+                  {/* Saved entry */}
+                  <div style={{
+                    background: '#faf8f5',
+                    border: '1px solid #e0d5c8',
+                    borderRadius: '5px',
+                    padding: '16px',
+                    marginBottom: '20px',
+                    lineHeight: '1.8',
+                    color: '#333',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {journalEntry}
+                  </div>
+
+                  {/* AI Response */}
+                  {loadingResponse && (
+                    <div style={{
+                      padding: '16px',
+                      color: '#888',
+                      fontSize: '14px',
+                      fontStyle: 'italic',
+                    }}>
+                      Reflecting on your entry...
+                    </div>
+                  )}
+
+                  {aiResponse && !loadingResponse && (
+                    <div style={{
+                      borderTop: '1px solid #e0d5c8',
+                      paddingTop: '20px',
+                      marginTop: '4px',
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#c9a96e',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        marginBottom: '12px',
+                      }}>
+                        A reflection
+                      </div>
+                      <div style={{
+                        lineHeight: '1.9',
+                        color: '#333',
+                        fontSize: '15px',
+                      }}>
+                        {aiResponse}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
