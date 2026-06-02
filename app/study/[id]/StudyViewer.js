@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -20,9 +20,21 @@ export default function StudyViewer({ session, userId }) {
   const [saveError, setSaveError] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [loadingResponse, setLoadingResponse] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [conversationId, setConversationId] = useState(null)
+  const chatBottomRef = useRef(null)
 
   const content = session.study_content
   const supabase = createClient()
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
 
   async function handleSaveJournal() {
     if (!journalEntry.trim()) return
@@ -30,7 +42,6 @@ export default function StudyViewer({ session, userId }) {
     setSaveError('')
 
     try {
-      // Save journal entry
       const { error } = await supabase.from('journal_entries').insert({
         user_id: userId,
         session_id: session.id,
@@ -43,7 +54,6 @@ export default function StudyViewer({ session, userId }) {
       setSaved(true)
       setSaving(false)
 
-      // Get AI response
       setLoadingResponse(true)
       try {
         const res = await fetch('/api/journal-response', {
@@ -60,7 +70,7 @@ export default function StudyViewer({ session, userId }) {
           setAiResponse(data.reflection)
         }
       } catch {
-        // AI response failing shouldn't affect the save confirmation
+        // Silent fail — save confirmation still shows
       }
       setLoadingResponse(false)
 
@@ -70,13 +80,47 @@ export default function StudyViewer({ session, userId }) {
     }
   }
 
+  async function handleSendChat(e) {
+    e.preventDefault()
+    if (!chatInput.trim() || chatLoading) return
+
+    const userMessage = chatInput.trim()
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setChatLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          sessionId: session.id,
+          passage: session.passage,
+          journalEntry,
+          conversationId,
+        }),
+      })
+      const data = await res.json()
+      if (data.reply) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+        setConversationId(data.conversationId)
+      }
+    } catch {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Something went wrong. Please try again.'
+      }])
+    }
+    setChatLoading(false)
+  }
+
   return (
     <main style={{
       minHeight: '100vh',
       background: '#faf8f5',
       fontFamily: 'Georgia, serif',
     }}>
-      {/* Header */}
       <header style={{
         background: 'white',
         borderBottom: '1px solid #e0d5c8',
@@ -86,7 +130,7 @@ export default function StudyViewer({ session, userId }) {
         gap: '16px',
       }}>
         <Link href="/" style={{ color: '#888', textDecoration: 'none', fontSize: '14px' }}>
-          ← Dashboard
+          Dashboard
         </Link>
         <h1 style={{ color: '#5c3d1e', margin: 0, fontSize: '20px', flex: 1 }}>
           {session.passage}
@@ -100,7 +144,6 @@ export default function StudyViewer({ session, userId }) {
 
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '24px 20px' }}>
 
-        {/* Tab Buttons */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '0' }}>
           {TABS.map(tab => (
             <button
@@ -115,7 +158,6 @@ export default function StudyViewer({ session, userId }) {
                 cursor: 'pointer',
                 fontFamily: 'Georgia, serif',
                 fontSize: '14px',
-                transition: 'all 0.15s',
               }}
             >
               {tab.label}
@@ -123,7 +165,6 @@ export default function StudyViewer({ session, userId }) {
           ))}
         </div>
 
-        {/* Tab Content */}
         <div style={{
           background: 'white',
           borderRadius: '0 5px 5px 5px',
@@ -312,14 +353,9 @@ export default function StudyViewer({ session, userId }) {
                     {journalEntry}
                   </div>
 
-                  {/* AI Response */}
+                  {/* AI Reflection */}
                   {loadingResponse && (
-                    <div style={{
-                      padding: '16px',
-                      color: '#888',
-                      fontSize: '14px',
-                      fontStyle: 'italic',
-                    }}>
+                    <div style={{ padding: '16px', color: '#888', fontSize: '14px', fontStyle: 'italic' }}>
                       Reflecting on your entry...
                     </div>
                   )}
@@ -328,7 +364,7 @@ export default function StudyViewer({ session, userId }) {
                     <div style={{
                       borderTop: '1px solid #e0d5c8',
                       paddingTop: '20px',
-                      marginTop: '4px',
+                      marginBottom: '24px',
                     }}>
                       <div style={{
                         fontSize: '12px',
@@ -339,20 +375,126 @@ export default function StudyViewer({ session, userId }) {
                       }}>
                         A reflection
                       </div>
-                      <div style={{
-                        lineHeight: '1.9',
-                        color: '#333',
-                        fontSize: '15px',
-                      }}>
+                      <div style={{ lineHeight: '1.9', color: '#333', fontSize: '15px' }}>
                         {aiResponse}
                       </div>
+
+                      {/* Continue conversation prompt */}
+                      {!showChat && (
+                        <button
+                          onClick={() => setShowChat(true)}
+                          style={{
+                            marginTop: '20px',
+                            background: 'none',
+                            border: '1px solid #e0d5c8',
+                            borderRadius: '5px',
+                            padding: '10px 18px',
+                            fontFamily: 'Georgia, serif',
+                            fontSize: '14px',
+                            color: '#888',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Still processing? Continue the conversation →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Chat Interface */}
+                  {showChat && (
+                    <div style={{
+                      borderTop: '1px solid #e0d5c8',
+                      paddingTop: '20px',
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#c9a96e',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        marginBottom: '16px',
+                      }}>
+                        Continue the conversation
+                      </div>
+
+                      {/* Chat messages */}
+                      <div style={{ marginBottom: '16px' }}>
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} style={{
+                            marginBottom: '16px',
+                            display: 'flex',
+                            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                          }}>
+                            <div style={{
+                              maxWidth: '80%',
+                              padding: '12px 16px',
+                              borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                              background: msg.role === 'user' ? '#5c3d1e' : '#f5f0e8',
+                              color: msg.role === 'user' ? 'white' : '#333',
+                              lineHeight: '1.7',
+                              fontSize: '15px',
+                            }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px' }}>
+                            <div style={{
+                              padding: '12px 16px',
+                              borderRadius: '12px 12px 12px 2px',
+                              background: '#f5f0e8',
+                              color: '#888',
+                              fontStyle: 'italic',
+                              fontSize: '14px',
+                            }}>
+                              ...
+                            </div>
+                          </div>
+                        )}
+                        <div ref={chatBottomRef} />
+                      </div>
+
+                      {/* Chat input */}
+                      <form onSubmit={handleSendChat} style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          placeholder="Continue the conversation..."
+                          style={{
+                            flex: 1,
+                            padding: '10px 14px',
+                            border: '1px solid #e0d5c8',
+                            borderRadius: '5px',
+                            fontFamily: 'Georgia, serif',
+                            fontSize: '15px',
+                            background: '#faf8f5',
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!chatInput.trim() || chatLoading}
+                          style={{
+                            padding: '10px 20px',
+                            background: chatInput.trim() && !chatLoading ? '#5c3d1e' : '#c9a96e',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontFamily: 'Georgia, serif',
+                            fontSize: '15px',
+                            cursor: chatInput.trim() && !chatLoading ? 'pointer' : 'not-allowed',
+                          }}
+                        >
+                          Send
+                        </button>
+                      </form>
                     </div>
                   )}
                 </div>
               )}
             </div>
           )}
-
         </div>
       </div>
     </main>
