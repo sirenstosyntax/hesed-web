@@ -112,9 +112,9 @@ export async function POST(request) {
     .single()
 
   if (sessionError) {
-    return Response.json({ error: 'Could not create session' }, { status: 500 })
+    console.error('Session insert error:', JSON.stringify(sessionError))
+    return Response.json({ error: 'Could not create session', detail: sessionError.message }, { status: 500 })
   }
-
   const sessionId = session.id
 
   // Run generation in background
