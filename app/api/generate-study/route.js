@@ -89,12 +89,13 @@ Be thorough and write with theological depth and pastoral warmth. Return only th
 
 export async function POST(request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  console.log('Auth check - user:', user?.id, 'error:', authError?.message)
 
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    return Response.json({ error: 'Unauthorized', authError: authError?.message }, { status: 401 })
   }
-
   const { passage } = await request.json()
   if (!passage) {
     return Response.json({ error: 'Passage is required' }, { status: 400 })
