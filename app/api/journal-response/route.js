@@ -17,6 +17,26 @@ Guidelines:
 - Never close with a summary that repeats what they said back to them
 - Your question should open a door, not corner them`
 
+async function extractThemes(journalEntry, passage) {
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 200,
+      system: 'You extract emotional and spiritual themes from journal entries for use in personalizing future Bible studies. Return only a JSON array of 1-2 short theme strings (under 15 words each). No preamble, no markdown.',
+      messages: [{
+        role: 'user',
+        content: `Passage: ${passage}\n\nJournal entry: ${journalEntry}\n\nExtract 1-2 themes this person is walking through. Focus on emotional or spiritual struggles, longings, or growth edges — not Bible facts. Return only a JSON array like ["theme one", "theme two"].`
+      }]
+    })
+
+    const raw = response.content[0].text.trim()
+    const themes = JSON.parse(raw)
+    return Array.isArray(themes) ? themes : []
+  } catch {
+    return []
+  }
+}
+
 export async function POST(request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -32,31 +52,43 @@ export async function POST(request) {
   }
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 400,
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: `Passage being studied: ${passage}
+    // Generate reflection and extract themes in parallel
+    const [reflectionResponse, themes] = await Promise.all([
+      anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: `Passage being studied: ${passage}
 ${journalPrompt ? `\nReflection prompt given: ${journalPrompt}` : ''}
-
 Person's journal entry:
 ${journalEntry}
-
 Respond warmly and personally to what they've written.`
-      }]
-    })
+        }]
+      }),
+      extractThemes(journalEntry, passage)
+    ])
 
-    const reflection = response.content[0].text
+    const reflection = reflectionResponse.content[0].text
 
-    // Save the AI response alongside the journal entry
+    // Save AI response to journal entry
     await supabase.from('journal_entries')
       .update({ ai_response: reflection })
       .eq('user_id', user.id)
       .eq('response', journalEntry)
       .order('created_at', { ascending: false })
       .limit(1)
+
+    // Save extracted themes to user_context
+    if (themes.length > 0) {
+      const themeRows = themes.map(theme => ({
+        user_id: user.id,
+        context_type: 'journal_theme',
+        content: theme,
+      }))
+      await supabase.from('user_context').insert(themeRows)
+    }
 
     return Response.json({ reflection })
 
