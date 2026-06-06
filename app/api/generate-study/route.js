@@ -96,9 +96,35 @@ export async function POST(request) {
   if (!user) {
     return Response.json({ error: 'Unauthorized', authError: authError?.message }, { status: 401 })
   }
-  const { passage } = await request.json()
-  if (!passage) {
+  const { passage: rawPassage } = await request.json()
+  if (!rawPassage) {
     return Response.json({ error: 'Passage is required' }, { status: 400 })
+  }
+
+  // Normalize shorthand references like "Ephesians 1" to full verse ranges
+  let passage = rawPassage
+  try {
+    const normRes = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 50,
+      system: 'You are a Bible reference normalizer. Return only the normalized reference, nothing else.',
+      messages: [{
+        role: 'user',
+        content: (
+          'Normalize this Bible reference to include full verse range. ' +
+          'If it already has verses, return it unchanged. ' +
+          'If it is just a chapter, expand to the full chapter verse range. ' +
+          'Examples: Ephesians 1 -> Ephesians 1:1-23, John 3 -> John 3:1-36. ' +
+          'Reference: ' + rawPassage
+        )
+      }]
+    })
+    const normalized = normRes.content[0].text.trim()
+    if (normalized && normalized.length < 50) {
+      passage = normalized
+    }
+  } catch {
+    // If normalization fails, use original
   }
 
   // Create session placeholder
