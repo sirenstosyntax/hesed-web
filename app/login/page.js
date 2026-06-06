@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -22,6 +23,8 @@ export default function LoginPage() {
     if (error) {
       if (error.message.toLowerCase().includes('invalid')) {
         setError('Incorrect email or password. Please try again.')
+      } else if (error.message.toLowerCase().includes('confirm')) {
+        setError('Please confirm your email address before signing in.')
       } else {
         setError('Could not sign in. Check your connection and try again.')
       }
@@ -38,22 +41,64 @@ export default function LoginPage() {
       minHeight: '100vh',
       background: '#faf8f5',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       fontFamily: 'Georgia, serif',
     }}>
+
+      {/* Left panel — explanation */}
       <div style={{
-        background: 'white',
-        padding: '48px',
-        borderRadius: '8px',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-        width: '100%',
-        maxWidth: '420px',
-      }}>
-        <h1 style={{ color: '#5c3d1e', marginBottom: '8px', fontSize: '28px' }}>Hesed</h1>
-        <p style={{ color: '#888', fontSize: '14px', marginBottom: '32px' }}>
-          God's steadfast, covenant love
+        flex: 1,
+        background: '#5c3d1e',
+        padding: '60px 48px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        color: 'white',
+      }}
+        className="hesed-left-panel"
+      >
+        <h1 style={{ fontSize: '36px', marginBottom: '12px', color: 'white' }}>Hesed</h1>
+        <p style={{ fontSize: '16px', opacity: 0.7, marginBottom: '32px', letterSpacing: '0.5px' }}>
+          /ˈkhe·sed/  •  Hebrew
         </p>
+        <p style={{ fontSize: '18px', lineHeight: '1.8', marginBottom: '24px', opacity: 0.95 }}>
+          The steadfast, covenant love of God — relentless, pursuing, and transforming.
+          Not earned. Not revoked. Always present.
+        </p>
+        <p style={{ fontSize: '15px', lineHeight: '1.8', opacity: 0.75 }}>
+          Hesed is a Bible study companion built to help you encounter that love,
+          not just learn about it. Studies deepen over time as Hesed learns what
+          you are walking through — meeting you where you are, wherever that is.
+        </p>
+        <div style={{
+          marginTop: '40px',
+          padding: '20px',
+          background: 'rgba(255,255,255,0.08)',
+          borderRadius: '8px',
+          borderLeft: '3px solid #c9a96e',
+        }}>
+          <p style={{ margin: 0, fontStyle: 'italic', opacity: 0.85, lineHeight: '1.7', fontSize: '14px' }}>
+            "I have loved you with an everlasting love; I have drawn you with unfailing kindness."
+          </p>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.55, fontSize: '13px' }}>
+            Jeremiah 31:3
+          </p>
+        </div>
+      </div>
+
+      {/* Right panel — sign in form */}
+      <div style={{
+        width: '420px',
+        padding: '60px 48px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        background: 'white',
+      }}
+        className="hesed-right-panel"
+      >
+        <h2 style={{ color: '#5c3d1e', marginBottom: '28px', fontSize: '22px' }}>
+          Sign in
+        </h2>
 
         <form onSubmit={handleSignIn}>
           <div style={{ marginBottom: '16px' }}>
@@ -119,13 +164,24 @@ export default function LoginPage() {
               fontFamily: 'Georgia, serif',
               fontSize: '16px',
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s',
             }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <p style={{ textAlign: 'center', marginTop: '20px', color: '#888', fontSize: '14px' }}>
+          New to Hesed?{' '}
+          <Link href="/signup" style={{ color: '#c9a96e' }}>Create an account</Link>
+        </p>
       </div>
+
+      <style>{`
+        @media (max-width: 700px) {
+          .hesed-left-panel { display: none; }
+          .hesed-right-panel { width: 100% !important; padding: 40px 24px !important; }
+        }
+      `}</style>
     </main>
   )
 }
