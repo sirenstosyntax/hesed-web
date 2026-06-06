@@ -177,9 +177,9 @@ export default function LoginPage() {
       </div>
 
       <style>{`
-        @media (max-width: 700px) {
-          .hesed-left-panel { display: none; }
-          .hesed-right-panel { width: 100% !important; padding: 40px 24px !important; }
+        @media (max-width: 860px) {
+          .hesed-left-panel { display: none !important; }
+          .hesed-right-panel { width: 100% !important; padding: 40px 24px !important; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
         }
       `}</style>
     </main>
