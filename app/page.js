@@ -8,6 +8,17 @@ export default async function Dashboard() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
+// Check if user has completed onboarding
+const { data: journeyData } = await supabase
+  .from('user_context')
+  .select('content')
+  .eq('user_id', user.id)
+  .eq('context_type', 'journey_type')
+  .limit(1)
+
+if (!journeyData || journeyData.length === 0) {
+  redirect('/onboarding')
+}
 
   // Fetch active tracks
   const { data: tracks } = await supabase
