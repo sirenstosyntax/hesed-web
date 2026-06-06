@@ -177,7 +177,7 @@ export default function StudyViewer({ session, userId }) {
           {activeTab === 'passage' && (
             <div>
               <h2 style={{ color: '#5c3d1e', marginTop: 0 }}>The Text</h2>
-              {content.passage?.translations?.map(t => (
+              {(content.passage?.translations || content.passage)?.map(t => (
                 <div key={t.name} style={{
                   marginBottom: '24px',
                   padding: '16px',
