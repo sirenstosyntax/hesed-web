@@ -8,9 +8,6 @@ export const metadata = {
     statusBarStyle: "default",
     title: "Hesed",
   },
-  formatDetection: {
-    telephone: false,
-  },
 };
 
 export const viewport = {
@@ -26,6 +23,17 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>
