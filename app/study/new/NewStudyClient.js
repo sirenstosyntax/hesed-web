@@ -41,38 +41,31 @@ export default function NewStudyClient() {
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from('sessions')
-        .select('study_content')
+        .select('study_content, study_html')
         .eq('id', sessionId)
         .single()
 
-    const interval = setInterval(async () => {
-  const { data } = await supabase
-    .from('sessions')
-    .select('study_content, study_html')
-    .eq('id', sessionId)
-    .single()
+      if (data?.study_content) {
+        clearInterval(interval)
 
-  if (data?.study_content) {
-    clearInterval(interval)
+        const trackId = searchParams.get('track')
+        const trackIndex = searchParams.get('index')
+        if (trackId && trackIndex !== null) {
+          await supabase
+            .from('tracks')
+            .update({ current_index: parseInt(trackIndex) + 1 })
+            .eq('id', trackId)
+        }
 
-    const trackId = searchParams.get('track')
-    const trackIndex = searchParams.get('index')
-    if (trackId && trackIndex !== null) {
-      await supabase
-        .from('tracks')
-        .update({ current_index: parseInt(trackIndex) + 1 })
-        .eq('id', trackId)
-    }
-
-    router.push(`/study/${sessionId}`)
-  } else if (data?.study_html === 'error') {
-    clearInterval(interval)
-    setStatus('error')
-    setErrorMessage(
-      'We weren\'t able to generate this study. This can happen with certain passages — please try a different one, or try again shortly.'
-    )
-  }
-}, 4000)  
+        router.push('/study/' + sessionId)
+      } else if (data?.study_html === 'error') {
+        clearInterval(interval)
+        setStatus('error')
+        setErrorMessage(
+          'We weren\'t able to generate this study. This can happen with certain passages — please try a different one, or try again shortly.'
+        )
+      }
+    }, 4000)
 
     return () => clearInterval(interval)
   }, [status, sessionId])
@@ -124,7 +117,7 @@ export default function NewStudyClient() {
         gap: '16px',
       }}>
         <a href="/" style={{ color: '#888', textDecoration: 'none', fontSize: '14px' }}>
-          ← Dashboard
+          Dashboard
         </a>
         <h1 style={{ color: '#5c3d1e', margin: 0, fontSize: '20px' }}>New Study</h1>
       </header>
