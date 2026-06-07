@@ -45,21 +45,34 @@ export default function NewStudyClient() {
         .eq('id', sessionId)
         .single()
 
-      if (data?.study_content) {
-        clearInterval(interval)
+    const interval = setInterval(async () => {
+  const { data } = await supabase
+    .from('sessions')
+    .select('study_content, study_html')
+    .eq('id', sessionId)
+    .single()
 
-        const trackId = searchParams.get('track')
-        const trackIndex = searchParams.get('index')
-        if (trackId && trackIndex !== null) {
-          await supabase
-            .from('tracks')
-            .update({ current_index: parseInt(trackIndex) + 1 })
-            .eq('id', trackId)
-        }
+  if (data?.study_content) {
+    clearInterval(interval)
 
-        router.push(`/study/${sessionId}`)
-      }
-    }, 4000)
+    const trackId = searchParams.get('track')
+    const trackIndex = searchParams.get('index')
+    if (trackId && trackIndex !== null) {
+      await supabase
+        .from('tracks')
+        .update({ current_index: parseInt(trackIndex) + 1 })
+        .eq('id', trackId)
+    }
+
+    router.push(`/study/${sessionId}`)
+  } else if (data?.study_html === 'error') {
+    clearInterval(interval)
+    setStatus('error')
+    setErrorMessage(
+      'We weren\'t able to generate this study. This can happen with certain passages — please try a different one, or try again shortly.'
+    )
+  }
+}, 4000)  
 
     return () => clearInterval(interval)
   }, [status, sessionId])
