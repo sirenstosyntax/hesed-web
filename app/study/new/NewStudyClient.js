@@ -159,6 +159,7 @@ export default function NewStudyClient() {
                   fontFamily: 'Georgia, serif',
                   fontSize: '16px',
                   background: '#faf8f5',
+                  color: '#2c2c2c',
                   boxSizing: 'border-box',
                   marginBottom: '16px',
                 }}
