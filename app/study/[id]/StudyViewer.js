@@ -195,7 +195,7 @@ export default function StudyViewer({ session, userId }) {
                   }}>
                     {t.name}
                   </div>
-                  <div style={{ lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{t.text}</div>
+                  <div style={{ lineHeight: '1.8', whiteSpace: 'pre-wrap', color: '#2c2c2c' }}>{t.text}</div>
                 </div>
               ))}
             </div>
