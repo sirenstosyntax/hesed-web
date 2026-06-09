@@ -312,6 +312,7 @@ export default function StudyViewer({ session, userId }) {
                       border: '1px solid #e0d5c8',
                       borderRadius: '5px',
                       background: '#faf8f5',
+                      color: '#2c2c2c',
                       resize: 'vertical',
                       boxSizing: 'border-box',
                     }}
