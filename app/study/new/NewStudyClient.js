@@ -193,7 +193,7 @@ export default function NewStudyClient() {
             <div style={{ marginTop: '24px', padding: '16px', background: '#faf8f5', borderRadius: '5px' }}>
               <p style={{ color: '#888', fontSize: '13px', margin: 0, lineHeight: '1.6' }}>
                 Hesed will research the passage across multiple translations, explore the historical
-                context, and prepare word studies and journal prompts. This takes about 60-90 seconds.
+                context, and prepare word studies and journal prompts. This usually takes under a minute.
               </p>
             </div>
           </div>
