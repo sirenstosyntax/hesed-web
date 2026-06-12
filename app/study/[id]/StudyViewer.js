@@ -12,6 +12,48 @@ const TABS = [
   { id: 'journal', label: '✍️ Journal' },
 ]
 
+function NextStep({ nextStep }) {
+  if (!nextStep?.passage) return null
+  return (
+    <div style={{
+      marginTop: '32px',
+      padding: '20px',
+      background: '#faf8f5',
+      border: '1px solid #e0d5c8',
+      borderRadius: '8px',
+    }}>
+      <div style={{
+        fontSize: '12px',
+        color: '#c9a96e',
+        textTransform: 'uppercase',
+        letterSpacing: '1px',
+        marginBottom: '10px',
+      }}>
+        Where to next
+      </div>
+      {nextStep.reason && (
+        <p style={{ lineHeight: '1.8', color: '#333', margin: '0 0 14px 0' }}>
+          {nextStep.reason}
+        </p>
+      )}
+      <Link
+        href={`/study/new?passage=${encodeURIComponent(nextStep.passage)}`}
+        style={{
+          display: 'inline-block',
+          padding: '10px 20px',
+          background: '#5c3d1e',
+          color: 'white',
+          textDecoration: 'none',
+          borderRadius: '5px',
+          fontSize: '15px',
+        }}
+      >
+        Study {nextStep.passage} →
+      </Link>
+    </div>
+  )
+}
+
 export default function StudyViewer({ session, userId }) {
   const [activeTab, setActiveTab] = useState('passage')
   const [journalEntry, setJournalEntry] = useState('')
@@ -274,6 +316,23 @@ export default function StudyViewer({ session, userId }) {
                   <p style={{ lineHeight: '1.8', color: '#333' }}>{section.content}</p>
                 </div>
               ))}
+
+              {/* Gospel bridge — generated for seekers; a gentle closing word */}
+              {content.gospel_bridge && (
+                <div style={{
+                  marginTop: '28px',
+                  padding: '18px',
+                  background: '#eef5ee',
+                  borderLeft: '4px solid #5a8a5a',
+                  borderRadius: '0 5px 5px 0',
+                  lineHeight: '1.9',
+                  color: '#2c4a2c',
+                }}>
+                  {content.gospel_bridge}
+                </div>
+              )}
+
+              <NextStep nextStep={content.next_step} />
             </div>
           )}
 
@@ -492,6 +551,9 @@ export default function StudyViewer({ session, userId }) {
                       </form>
                     </div>
                   )}
+
+                  {/* Where to next — shown once the study's journal is complete */}
+                  <NextStep nextStep={content.next_step} />
                 </div>
               )}
             </div>
