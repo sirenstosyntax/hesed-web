@@ -59,6 +59,7 @@ export default function StudyViewer({ session, userId }) {
   const [journalEntry, setJournalEntry] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [loadingEntry, setLoadingEntry] = useState(true)
   const [saveError, setSaveError] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [loadingResponse, setLoadingResponse] = useState(false)
@@ -77,6 +78,31 @@ export default function StudyViewer({ session, userId }) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [chatMessages])
+
+  // Load the user's existing journal entry for this study, if one exists
+  useEffect(() => {
+    async function loadExistingEntry() {
+      try {
+        const { data } = await supabase
+          .from('journal_entries')
+          .select('response')
+          .eq('session_id', session.id)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (data && data.length > 0 && data[0].response) {
+          setJournalEntry(data[0].response)
+          setSaved(true)
+        }
+      } catch {
+        // If the lookup fails, fall through to a fresh journal
+      }
+      setLoadingEntry(false)
+    }
+    loadExistingEntry()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSaveJournal() {
     if (!journalEntry.trim()) return
@@ -332,7 +358,32 @@ export default function StudyViewer({ session, userId }) {
                 </div>
               )}
 
-              <NextStep nextStep={content.next_step} />
+              {/* Gentle nudge toward reflection — the next-step card waits in the Journal */}
+              <div style={{
+                marginTop: '32px',
+                paddingTop: '20px',
+                borderTop: '1px solid #e0d5c8',
+                textAlign: 'center',
+              }}>
+                <p style={{ color: '#888', fontSize: '14px', fontStyle: 'italic', marginBottom: '14px' }}>
+                  Before moving on, take a moment with what's stirring.
+                </p>
+                <button
+                  onClick={() => setActiveTab('journal')}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #c9a96e',
+                    borderRadius: '5px',
+                    padding: '10px 20px',
+                    fontFamily: 'Georgia, serif',
+                    fontSize: '14px',
+                    color: '#5c3d1e',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✍️ Take it to the Journal →
+                </button>
+              </div>
             </div>
           )}
 
@@ -355,7 +406,11 @@ export default function StudyViewer({ session, userId }) {
                 </div>
               )}
 
-              {!saved ? (
+              {loadingEntry ? (
+                <p style={{ color: '#aaa', fontSize: '14px', fontStyle: 'italic' }}>
+                  Opening your journal...
+                </p>
+              ) : !saved ? (
                 <>
                   <textarea
                     value={journalEntry}
