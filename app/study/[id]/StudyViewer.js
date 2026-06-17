@@ -11,6 +11,24 @@ const TABS = [
   { id: 'application', label: '🌱 Application' },
   { id: 'journal', label: '✍️ Journal' },
 ]
+function renderVerses(text) {
+  // Split on bracketed verse numbers like [1], keeping the numbers as delimiters
+  const parts = text.split(/\[(\d+)\]/g)
+  const out = []
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      // Odd indices are the captured verse numbers
+      out.push(
+        <sup key={i} style={{ color: '#c9a96e', fontWeight: 'bold', fontSize: '0.7em', marginRight: '2px' }}>
+          {parts[i]}
+        </sup>
+      )
+    } else if (parts[i]) {
+      out.push(<span key={i}>{parts[i]}</span>)
+    }
+  }
+  return out
+}
 
 function NextStep({ nextStep }) {
   if (!nextStep?.passage) return null
@@ -263,7 +281,7 @@ export default function StudyViewer({ session, userId }) {
                   }}>
                     {t.name}
                   </div>
-                  <div style={{ lineHeight: '1.8', whiteSpace: 'pre-wrap', color: '#2c2c2c' }}>{t.text}</div>
+                  <div style={{ lineHeight: '1.8', whiteSpace: 'pre-wrap', color: '#2c2c2c' }}>{renderVerses(t.text)}</div>
                 </div>
               ))}
             </div>
